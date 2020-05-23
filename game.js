@@ -66,128 +66,69 @@ class Example extends Phaser.Scene {
 
         this.bullets;
         this.ship;
-        this.socket = io();
     }
 
     preload() {
+        this.load.image('bg', 'assets/zeldaEpic.png');
         this.load.image('bullet', 'assets/bullet.png');
         this.load.image('ship', 'assets/arrow.png');
     }
 
     create() {
+        this.cameras.main.setBounds(0, 0, 10000, 10000);
+        this.physics.world.setBounds(0, 0, 10000, 10000);
+        this.add.image(0, 0, 'bg').setOrigin(0,0);
+        this.add.image(1000,1000,'ship');
         this.bullets = new Bullets(this);
-        this.socket.on('new player',([socket_list,socket_number])=>{
-            for(let key in socket_list){
-                if(!(key in users)){
-                    let user = {};
-                    user.id = key;
-                    user.x = socket_list[key].x
-                    user.y = socket_list[key].y
-                    if(key === socket_number){
-                        my_x_y[0] = user.x;
-                        my_x_y[1] = user.y;
-                        this.ship = this.physics.add.sprite(my_x_y[0], my_x_y[1], 'ship');
-                        this.ship.setCollideWorldBounds(true);
-                        users[user.id] = {};
-                    }else{
-                        console.log("I am a big pro")
-                        user.ship = this.physics.add.sprite(socket_list[key].x, socket_list[key].y, 'ship')
-                        overlap_ship_list.push(user.ship);
-                        console.log("x:"+socket_list[key].x)
-                        console.log("y:"+socket_list[key].y)
-                        user.bullets = new Bullets(this);
-                        users[user.id] = user
-                        users[user.id].ship.setVisible(true);
-                        console.log("add socket number"+user.id)
-                        this.physics.add.overlap(users[user.id].ship,this.bullets, null, this.been_shot, this);
-                    }
-                }
-            }
-        })
-        for(let times = 0; times< overlap_ship_list.length;times++){
-            this.physics.add.overlap(overlap_ship_list[times], this.bullets, null, this.been_shot, this);
-        }
-        this.socket.on('ship angle',([angle,socket_number])=>{
-            users[socket_number].ship.angle = angle;
-        })
-
-        this.socket.on('player disconnect',(socket_number)=>{
-            if(users[socket_number] != undefined){
-                console.log('users: '+socket_number);
-                console.log("socket number"+socket_number)
-                users[socket_number].ship.destroy()
-                delete users[socket_number].ship;
-                console.log("nope")
-            } 
-            
-        })
-        this.socket.on('player move',([socket_number,x,y])=>{
-            users[socket_number].ship.x = x;
-            users[socket_number].ship.y = y;
-        })
-        this.socket.on("fire",([socket_number,shipx,shipy,posx,posy])=>{
-            users[socket_number].bullets.fireBullet(shipx,shipy,posx,posy);
-        })
-        this.socket.emit('new player')
+        this.ship = this.physics.add.sprite(100 ,200, 'ship');        
         this.rect = new Phaser.Geom.Rectangle(200, 500, 400, 2);
         graphics = this.add.graphics({ lineStyle: { width: 2, color: 0x00FF00}, fillStyle: { color: 0x0000aa } });
         this.health_bar = graphics.strokeRectShape(this.rect);
-        console.log(this.health_bar)
-        bullet = this.physics.add.group()
-        
-       
+        this.health_bar.setScrollFactor(0);
+   
+        this.cameras.main.startFollow(this.ship, true, 1, 1);
+
         this.input.on('pointermove', (pointer) => {
-            let dx = pointer.x - this.ship.x;
-            let dy = pointer.y - this.ship.y;
+            let dx = this.cameras.main.scrollX + pointer.x - this.ship.x;
+            console.log("camera x:"+this.cameras.main.scrollX)
+            let dy = this.cameras.main.scrollY + pointer.y - this.ship.y;
             let angle = Math.atan2(dy, dx)
             let turn_angle = angle * (180 / Math.PI)
             this.ship.angle = 90 + turn_angle;
-            this.socket.emit('ship angle',90 + turn_angle)
         });
         this.input.on('pointerdown', (pointer) => {
             var posx = pointer.x;
             var posy = pointer.y;
             this.bullets.fireBullet(this.ship.x, this.ship.y, posx, posy);
-            this.socket.emit('fire',[this.ship.x, this.ship.y, posx, posy]);
         });
-        //info = this.add.text(10, 10, '', { font: '48px Arial', fill: '#ffffff' });
-        //timer = this.time.addEvent({ delay: 10000, callback: this.gameOver, callbackScope: this });
-        
-        
+  
         Keys = this.input.keyboard.addKeys('W,S,A,D');
-
-            
     }
     update() {
-        //this.physics.add.overlap(enemy, this.bullets, null, this.happy, this);
-        //info.setText('Kills: ' + kills + '\nTime: ' + Math.floor(timer.getElapsed()));
         if(this.ship != undefined){
             if (Keys.S.isDown) {
                 this.ship.setVelocityY(330);
-                this.socket.emit('player move',[this.ship.x,this.ship.y])
             }
             else if (Keys.W.isDown) {
                 this.ship.setVelocityY(-330);
-                this.socket.emit('player move',[this.ship.x,this.ship.y])
             }
             else if (Keys.A.isDown) {
                 this.ship.setVelocityX(-300);
-                this.socket.emit('player move',[this.ship.x,this.ship.y])
             }
             else if (Keys.D.isDown) {
                 this.ship.setVelocityX(300);
-                this.socket.emit('player move',[this.ship.x,this.ship.y])
             }
             else {
                 this.ship.setVelocityX(0);
                 this.ship.setVelocityY(0);
-                
             }
         }
     }
+
     remove(arr, value){
         return arr.filter(function(ele){ return ele != value; });
     }
+
     gameOver() {
 
         this.input.off('pointermove');
@@ -217,9 +158,10 @@ function getRandomInt(max) {
 
 
 const config = {
-    type: Phaser.AUTO,
+    type: Phaser.CANVAS,
     width: 800,
     height: 600,
+    pixelArt: true,
     parent: 'phaser-example',
     physics: {
         default: 'arcade',
